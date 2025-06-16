@@ -1,19 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { foodItems } from "@/data/foodItem";
 
 export default function MenuPage() {
+  const router = useRouter();
   const [user, setUser] = useState<{
     tableCode: number;
     userName: string;
   } | null>(null);
   const [expandedIds, setExpandedIds] = useState<number[]>([]); // allow multiple expanded
   const [activeTabs, setActiveTabs] = useState<Record<number, string>>({});
+  const [selectedCategory, setSelectedCategory] = useState("Main Course"); // default or 'All'
 
-  useEffect(() => {
-    const stored = localStorage.getItem("userData");
-    if (stored) setUser(JSON.parse(stored));
-  }, []);
+useEffect(() => {
+  const stored = localStorage.getItem("userData");
+  if (stored) setUser(JSON.parse(stored));
+
+  const storedCart = localStorage.getItem("orderCart");
+  if (storedCart) {
+    const parsed = JSON.parse(storedCart);
+    const cartMap = Object.fromEntries(parsed.map((item: any) => [item.id, item]));
+    setCart(cartMap); // cart: Record<number, CartItem>
+  }
+}, []);
 
   const toggleExpand = (id: number) => {
     setExpandedIds((prev) => {
@@ -37,24 +47,34 @@ export default function MenuPage() {
   const [cart, setCart] = useState<Record<number, CartItem>>({});
 
   const categoryTotals = Object.values(cart).reduce((acc, item) => {
-  if (!acc[item.category]) acc[item.category] = 0;
-  acc[item.category] += item.total;
-  return acc;
-}, {} as Record<string, number>);
+    if (!acc[item.category]) acc[item.category] = 0;
+    acc[item.category] += item.total;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const visibleItems =
+    selectedCategory === "All"
+      ? foodItems
+      : foodItems.filter((item) => item.category === selectedCategory);
 
   const increaseItem = (item: any) => {
     setCart((prev) => {
       const existing = prev[item.id];
       const count = existing ? existing.count + 1 : 1;
-      return {
+      const updated = {
         ...prev,
         [item.id]: {
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          category: item.category,
           count,
+          addedBy: user?.userName || "Guest",
           total: item.price * count,
-          category: item.category || "Main Course", // fallback
-          customization: existing?.customization || "",
         },
       };
+      localStorage.setItem("orderCart", JSON.stringify(Object.values(updated)));
+      return updated;
     });
   };
 
@@ -64,10 +84,14 @@ export default function MenuPage() {
       if (!existing || existing.count <= 1) {
         const newCart = { ...prev };
         delete newCart[item.id];
+        localStorage.setItem(
+          "orderCart",
+          JSON.stringify(Object.values(newCart))
+        );
         return newCart;
       }
       const count = existing.count - 1;
-      return {
+      const updated = {
         ...prev,
         [item.id]: {
           ...existing,
@@ -75,6 +99,8 @@ export default function MenuPage() {
           total: item.price * count,
         },
       };
+      localStorage.setItem("orderCart", JSON.stringify(Object.values(updated)));
+      return updated;
     });
   };
 
@@ -102,28 +128,30 @@ export default function MenuPage() {
         {["All", "Starters", "Main Course", "Dessert"].map((cat) => (
           <button
             key={cat}
-            className={`px-4 py-1 rounded-full border text-sm ${
-              cat === "Main Course"
-                ? "bg-green-600 text-white"
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-4 py-1 rounded-full border text-sm transition ${
+              selectedCategory === cat
+                ? "bg-green-600 text-white border-green-600"
                 : "border-gray-300 text-gray-600"
             }`}
           >
             {cat}
           </button>
         ))}
+
         <button className="ml-auto px-3 border rounded-lg">🔍</button>
         <button className="px-3 border rounded-lg">⬇️</button>
       </div>
 
       {/* Food List */}
       <div className="space-y-4 mt-4">
-        {foodItems.map((item) => {
+        {visibleItems.map((item) => {
           const isExpanded = expandedIds.includes(item.id);
           const tab = activeTabs[item.id];
           return (
             <div
               key={item.id}
-              className="bg-gray-50 border rounded-xl p-4 transition-all duration-300"
+              className="relative  bg-gray-50 border rounded-xl p-4 transition-all duration-300"
             >
               {/* Expanded Card */}
               {isExpanded ? (
@@ -154,17 +182,6 @@ export default function MenuPage() {
                     ⭐ {item.rating} • 🍽 2 serves
                   </p>
 
-                  {/* <div className="flex gap-2 mt-4 flex-wrap">
-                    <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded">Ingredients</span>
-                    <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded">Allergen Info</span>
-                    <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded">Preparation</span>
-                    <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded">Nutritional Values</span>
-                  </div>
-
-                  <p className="text-sm mt-3 text-gray-700">
-                    Basmati rice, chicken, onions, tomatoes, yogurt, ginger, garlic, biryani masala, mint, coriander.
-                  </p> */}
-
                   {/* Tab Buttons */}
                   <div className="flex gap-2 mt-4 flex-wrap text-sm">
                     {[
@@ -193,7 +210,7 @@ export default function MenuPage() {
                   </div>
 
                   {/* Tab Content */}
-                  <div className="mt-4 text-sm text-gray-700">
+                  <div className="mt-4 mb-4 text-sm text-gray-700">
                     {tab === "Ingredients" && (
                       <div className="flex flex-wrap gap-2">
                         {item.details.ingredients.slice(0, 6).map((ing, i) => (
@@ -262,35 +279,39 @@ export default function MenuPage() {
                       </button>
                     </div>
                   )}
-                  {isInCart(item.id) ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => decreaseItem(item)}
-                        className="bg-red-500 text-white px-2 rounded text-sm"
-                      >
-                        −
-                      </button>
-                      <span className="font-medium">{cart[item.id].count}</span>
+                  <div className="absolute bottom-4 right-4">
+                    {isInCart(item.id) ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => decreaseItem(item)}
+                          className="bg-red-500 text-white px-2 rounded text-sm"
+                        >
+                          −
+                        </button>
+                        <span className="font-medium">
+                          {cart[item.id].count}
+                        </span>
+                        <button
+                          onClick={() => increaseItem(item)}
+                          className="bg-green-600 text-white px-2 rounded text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         onClick={() => increaseItem(item)}
-                        className="bg-green-600 text-white px-2 rounded text-sm"
+                        className="bg-green-600 text-white px-3 py-1 rounded mt-4 text-sm"
                       >
-                        +
+                        Add
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => increaseItem(item)}
-                      className="bg-green-600 text-white px-3 py-1 rounded mt-1 text-sm"
-                    >
-                      Add
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </>
               ) : (
                 /* Minimized Card */
                 <div
-                  className="flex justify-between items-center"
+                  className="flex justify-between items-center cursor-pointer"
                   onClick={() => toggleExpand(item.id)}
                 >
                   <div>
@@ -300,7 +321,10 @@ export default function MenuPage() {
                       • ⭐ {item.rating} • 🍽 2 serves
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div
+                    className="text-right"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <p className="font-bold text-gray-800">₹{item.price}</p>
                     {isInCart(item.id) ? (
                       <div className="flex items-center gap-2">
@@ -352,7 +376,10 @@ export default function MenuPage() {
         </div>
 
         <div className="text-right">
-          <button className="bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium mb-1">
+          <button
+            className="bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium mb-1"
+            onClick={() => router.push("/order-summary")}
+          >
             Order
           </button>
           <p className="text-base font-bold">
