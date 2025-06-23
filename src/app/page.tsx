@@ -2,6 +2,9 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 // import { authenticateUser } from '@utils/authService';
+// import { db } from '../../firebase';
+// import { collection, getDocs } from 'firebase/firestore';
+
 
 export default function Home() {
   const [name, setName] = useState('');
@@ -55,7 +58,7 @@ export default function Home() {
             type="submit"
             className="w-full py-3 bg-orange-500 text-white font-semibold rounded-lg shadow-md hover:bg-orange-600 transition"
           >
-            🍽️ Let's Dine
+            Lets Dine
           </button>
         </form>
       </div>
@@ -65,7 +68,7 @@ export default function Home() {
           <div className="flex justify-center mb-2">
             <img src="/biryani-icon.png" alt="dish" className="w-10 h-10" />
           </div>
-          <h2 className="font-semibold text-lg">Chef's Special Today</h2>
+          <h2 className="font-semibold text-lg">Chefs Special Today</h2>
           <p className="text-sm mt-1">Aromatic Hyderabadi Biryani with tender mutton and fragrant basmati rice</p>
           <div className="mt-2 flex justify-center space-x-1">
             <span className="w-2 h-2 bg-orange-500 rounded-full"></span>

@@ -19,9 +19,11 @@ useEffect(() => {
 
   const storedCart = localStorage.getItem("orderCart");
   if (storedCart) {
-    const parsed = JSON.parse(storedCart);
-    const cartMap = Object.fromEntries(parsed.map((item: any) => [item.id, item]));
-    setCart(cartMap); // cart: Record<number, CartItem>
+    const parsed = JSON.parse(storedCart) as CartItem[];
+    const cartMap: Record<number, CartItem> = Object.fromEntries(
+      parsed.map((item) => [item.id, item])
+    );
+    setCart(cartMap);
   }
 }, []);
 
@@ -37,72 +39,83 @@ useEffect(() => {
       return prev;
     });
   };
+
   type CartItem = {
-    count: number;
-    total: number;
-    category: string;
-    customization?: string;
-  };
+  id: number;
+  name: string;
+  price: number;
+  count: number;
+  category: string;
+  addedBy: string;
+  total: number;
+  customization?: string;
+};
+  
 
   const [cart, setCart] = useState<Record<number, CartItem>>({});
 
-  const categoryTotals = Object.values(cart).reduce((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = 0;
-    acc[item.category] += item.total;
-    return acc;
-  }, {} as Record<string, number>);
+  // const categoryTotals = Object.values(cart).reduce((acc, item) => {
+  //   if (!acc[item.category]) acc[item.category] = 0;
+  //   acc[item.category] += item.total;
+  //   return acc;
+  // }, {} as Record<string, number>);
 
   const visibleItems =
     selectedCategory === "All"
       ? foodItems
       : foodItems.filter((item) => item.category === selectedCategory);
 
-  const increaseItem = (item: any) => {
-    setCart((prev) => {
-      const existing = prev[item.id];
-      const count = existing ? existing.count + 1 : 1;
-      const updated = {
-        ...prev,
-        [item.id]: {
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          category: item.category,
-          count,
-          addedBy: user?.userName || "Guest",
-          total: item.price * count,
-        },
-      };
-      localStorage.setItem("orderCart", JSON.stringify(Object.values(updated)));
-      return updated;
-    });
-  };
+      type IncomingItem = Omit<CartItem, 'count' | 'addedBy' | 'total'>;
+ const increaseItem = (item: IncomingItem) => {
+  setCart((prev) => {
+    const existing = prev[item.id];
+    const count = existing ? existing.count + 1 : 1;
 
-  const decreaseItem = (item: any) => {
-    setCart((prev) => {
-      const existing = prev[item.id];
-      if (!existing || existing.count <= 1) {
-        const newCart = { ...prev };
-        delete newCart[item.id];
-        localStorage.setItem(
-          "orderCart",
-          JSON.stringify(Object.values(newCart))
-        );
-        return newCart;
-      }
-      const count = existing.count - 1;
-      const updated = {
-        ...prev,
-        [item.id]: {
-          ...existing,
-          count,
-          total: item.price * count,
-        },
-      };
-      localStorage.setItem("orderCart", JSON.stringify(Object.values(updated)));
-      return updated;
-    });
-  };
+    const updated: Record<number, CartItem> = {
+      ...prev,
+      [item.id]: {
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        category: item.category,
+        count,
+        addedBy: user?.userName || "Guest",
+        total: item.price * count,
+      },
+    };
+
+    localStorage.setItem("orderCart", JSON.stringify(Object.values(updated)));
+    return updated;
+  });
+};
+
+
+  const decreaseItem = (item: IncomingItem) => {
+  setCart((prev) => {
+    const existing = prev[item.id];
+    if (!existing || existing.count <= 1) {
+      const newCart = { ...prev };
+      delete newCart[item.id];
+      localStorage.setItem("orderCart", JSON.stringify(Object.values(newCart)));
+      return newCart;
+    }
+
+    const count = existing.count - 1;
+
+    const updated: Record<number, CartItem> = {
+      ...prev,
+      [item.id]: {
+        ...existing,
+        count,
+        total: item.price * count,
+      },
+    };
+
+    localStorage.setItem("orderCart", JSON.stringify(Object.values(updated)));
+    return updated;
+  });
+};
+
 
   const isInCart = (id: number) => !!cart[id];
 
